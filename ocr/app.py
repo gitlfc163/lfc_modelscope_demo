@@ -70,24 +70,30 @@ from PIL import Image
 import pandas as pd
 
 title = "读光OCR-多场景文字识别"
-description = "给定图片作为输入，选择相应场景，我们的模型会输出图片中文字行的坐标位置和识别结果。本页面提供了在线体验的服务，欢迎使用！更多详情可以参考如下文档: https://modelscope.cn/dynamic/article/42"
+description = "给定图片作为输入，选择相应场景，我们的模型会输出图片中文字行的坐标位置和识别结果。本页面提供了在线体验的服务，欢迎使用！"
 examples = [
-    ['./img/ocr_general.jpg',"通用场景"], 
+    ['./img/ocr_general.jpg',"通用场景"], #,'./img/test-invoice.png',"通用场景"
     ['./img/license_plate_detection.jpg',"车牌场景"], 
     ['./img/ocr_scene.jpg',"自然场景"], 
     ['./img/ocr_table2.jpg',"文档场景"], 
     ['./img/ocr_handwriting.jpg',"手写场景"]
     ]
 #examples = ['./ocr_spotting.jpg', './license_plate_detection.jpg', './ocr_scene.jpg', './ocr_table.jpg', './ocr_handwriting.jpg']
-ocr_detection = pipeline(Tasks.ocr_detection, model='damo/cv_resnet18_ocr-detection-line-level_damo')
-license_plate_detection = pipeline(Tasks.license_plate_detection, model='damo/cv_resnet18_license-plate-detection_damo')
-
+# 通用场景模型
 ocr_recognition = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-general_damo')
-ocr_recognition_handwritten = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-handwritten_damo')
-ocr_recognition_document = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-document_damo')
+# 用于文本检测
+ocr_detection = pipeline(Tasks.ocr_detection, model='damo/cv_resnet18_ocr-detection-line-level_damo')
+# 自然场景模型
 ocr_recognition_scene = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-scene_damo')
+# 手写场景模型
+ocr_recognition_handwritten = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-handwritten_damo')
+# 文档场景模型
+ocr_recognition_document = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-document_damo')
+# 车牌场景模型
+license_plate_detection = pipeline(Tasks.license_plate_detection, model='damo/cv_resnet18_license-plate-detection_damo')
+# 车牌场景模型
 ocr_recognition_licenseplate = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-licenseplate_damo')
-
+# 图像类型选择
 types_dict = {"通用场景":ocr_recognition, "自然场景":ocr_recognition_scene, "手写场景":ocr_recognition_handwritten, "文档场景":ocr_recognition_document, "车牌场景":ocr_recognition_licenseplate}
 
 def draw_boxes(image_full, det_result):
@@ -101,6 +107,7 @@ def draw_boxes(image_full, det_result):
     image_draw = np.array(image_full)
     return image_draw
 
+# 文字检测处理
 def text_detection(image_full, ocr_detection):
     det_result = ocr_detection(image_full)
     det_result = det_result['polygons']
@@ -109,6 +116,7 @@ def text_detection(image_full, ocr_detection):
     det_result_list = sorted(det_result_list, key=lambda x: 0.01*sum(x[::2])/4+sum(x[1::2])/4)     
     return np.array(det_result_list)
 
+# 文本识别处理
 def text_recognition(det_result, image_full, ocr_recognition):
     output = []
     for i in range(det_result.shape[0]):
@@ -119,6 +127,7 @@ def text_recognition(det_result, image_full, ocr_recognition):
     result = pd.DataFrame(output, columns=['检测框序号', '行识别结果', '检测框坐标'])
     return result
 
+# 一键识别处理函数
 def text_ocr(image_full, types='通用场景'):
     if types == '车牌场景':
         det_result = text_detection(image_full, license_plate_detection)
@@ -147,4 +156,4 @@ with gr.Blocks() as demo:
 
     btn_submit.click(fn=text_ocr, inputs=[img_input, select_types], outputs=[img_output, text_output])
 
-    demo.launch(server_port=8097)
+    demo.launch(server_name="172.17.70.46",server_port=8097)

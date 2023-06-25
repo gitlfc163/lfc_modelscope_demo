@@ -8,7 +8,11 @@ import math
 import gradio as gr
 from PIL import ImageDraw
 
-# scripts for crop images
+from torchvision import transforms
+from PIL import Image
+import pandas as pd
+
+# 根据给定的位置参数，对图片进行裁剪和变换，返回裁剪后的图片
 def crop_image(img, position):
     def distance(x1,y1,x2,y2):
         return math.sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2))    
@@ -53,6 +57,7 @@ def crop_image(img, position):
     dst = cv2.warpPerspective(img, transform, (int(img_width), int(img_height)))
     return dst
 
+# 对给定的坐标点进行排序，返回排序后的坐标点
 def order_point(coor):
     arr = np.array(coor).reshape([4, 2])
     sum_ = np.sum(arr, 0)
@@ -65,10 +70,6 @@ def order_point(coor):
     sort_points = sort_points.reshape([4, 2]).astype('float32')
     return sort_points
 
-from torchvision import transforms
-from PIL import Image
-import pandas as pd
-
 title = "读光OCR-多场景文字识别"
 description = "给定图片作为输入，选择相应场景，我们的模型会输出图片中文字行的坐标位置和识别结果。本页面提供了在线体验的服务，欢迎使用！"
 examples = [
@@ -79,6 +80,7 @@ examples = [
     ['./img/ocr_handwriting.jpg',"手写场景"]
     ]
 #examples = ['./ocr_spotting.jpg', './license_plate_detection.jpg', './ocr_scene.jpg', './ocr_table.jpg', './ocr_handwriting.jpg']
+# 加载不同场景的模型
 # 通用场景模型
 ocr_recognition = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-general_damo')
 # 用于文本检测
@@ -96,6 +98,7 @@ ocr_recognition_licenseplate = pipeline(Tasks.ocr_recognition, model='damo/cv_co
 # 图像类型选择
 types_dict = {"通用场景":ocr_recognition, "自然场景":ocr_recognition_scene, "手写场景":ocr_recognition_handwritten, "文档场景":ocr_recognition_document, "车牌场景":ocr_recognition_licenseplate}
 
+# draw_boxes用于在图片上绘制文字行的边框，并将边框内的图片传递给相应的识别模型，返回识别结果
 def draw_boxes(image_full, det_result):
     image_full = Image.fromarray(image_full)
     draw = ImageDraw.Draw(image_full)

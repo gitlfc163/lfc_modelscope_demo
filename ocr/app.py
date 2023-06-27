@@ -59,14 +59,22 @@ def crop_image(img, position):
 
 # 对给定的坐标点进行排序，返回排序后的坐标点
 def order_point(coor):
+    # 将coor参数转换为一个numpy数组，并将其形状改为[4,2]，表示四行两列
     arr = np.array(coor).reshape([4, 2])
+    # 计算数组中所有坐标的和，并除以4，得到四边形区域的中心点坐标
     sum_ = np.sum(arr, 0)
     centroid = sum_ / arr.shape[0]
+    # 计算每个坐标与中心点之间的夹角，使用numpy.arctan2函数，得到一个包含四个角度值的数组
     theta = np.arctan2(arr[:, 1] - centroid[1], arr[:, 0] - centroid[0])
+    # 根据角度值对数组进行升序排序，使用numpy.argsort函数，得到一个包含四个索引值的数组
     sort_points = arr[np.argsort(theta)]
+    # 根据索引值重新排列原始数组，得到一个按照极坐标顺序排列的数组
+    # 将数组形状改为[4,-1]，表示四行任意列
     sort_points = sort_points.reshape([4, -1])
+    # 检查第一个坐标是否在中心点的右侧，如果是，则将数组旋转一次，使得第一个坐标在中心点的左侧
     if sort_points[0][0] > centroid[0]:
         sort_points = np.concatenate([sort_points[3:], sort_points[:3]])
+    # 将数组形状改为[4,2]，表示四行两列，并将其转换为浮点类型
     sort_points = sort_points.reshape([4, 2]).astype('float32')
     return sort_points
 
@@ -100,6 +108,106 @@ ocr_recognition_licenseplate = pipeline(Tasks.ocr_recognition, model='damo/cv_co
 # 图像类型选择
 types_dict = {"通用场景":ocr_recognition, "自然场景":ocr_recognition_scene, "手写场景":ocr_recognition_handwritten, "文档场景":ocr_recognition_document, "车牌场景":ocr_recognition_licenseplate}
 
+# 定义返回结果
+class InvoicesResult:
+    # 发票类型
+    invoiceType=''
+    # 发票号码
+    invoiceCode=''
+    # 开票日期
+    invoiceDate=''
+    # 付款单位
+    payerUnitName=''
+    # 付款单位纳税人识别号
+    ptaxAccounts=''
+    # 付款单位客户地址
+    paddress=''
+    # 付款单位客户电话
+    ptlephone=''
+    # 付款单位开户行
+    pbankName=''
+    # 付款单位银行账号
+    pbankAccounts=''
+
+    # 开票内容
+    invoiceContent=''
+    # 开票金额（元）
+    amount=0.0
+    # 价税合计(大写)
+    capital=''
+    # 税率
+    invoiceTaxType=''
+    # 价税合计（元）
+    invoiceTaxValue=0.0
+    # 不含税额（元）
+    excludingTaxValue=0.0
+
+    # 客户名称
+    customer=''
+    # 纳税人识别号
+    taxAccounts=''
+    # 客户地址
+    address=''
+    # 客户电话
+    tlephone=''
+    # 开户行
+    bankName=''
+    # 银行账号
+    bankAccounts=''
+    # 开票人
+
+    # __init__
+    def __init__(self):
+        self.invoiceType=''
+        self.invoiceCode=''
+        self.invoiceDate=''
+        self.amount=0.0
+        self.capital=''
+        self.invoiceContent=''
+        self.invoiceTaxType=''
+        self.invoiceTaxValue=0.0
+        self.excludingTaxValue=0.0
+        self.payerUnitName=''
+        self.ptaxAccounts=''
+        self.paddress=''
+        self.ptlephone=''
+        self.pbankName=''
+        self.pbankAccounts=''
+        self.customer=''
+        self.taxAccounts=''
+        self.address=''
+        self.tlephone=''
+        self.bankName=''
+        self.bankAccounts=''
+        
+    def set_invoice(self, invoiceType,invoiceCode,invoiceDate,amount,capital,invoiceContent,invoiceTaxType
+                 ,invoiceTaxValue,excludingTaxValue,payerUnitName,ptaxAccounts,paddress,ptlephone
+                 ,pbankName,pbankAccounts,customer,taxAccounts,address,tlephone
+                 ,bankName,bankAccounts):
+        self.invoiceType = invoiceType
+        self.invoiceCode = invoiceCode
+        self.invoiceDate = invoiceDate
+        self.amount = amount
+        self.capital = capital
+        self.invoiceContent = invoiceContent
+
+        self.invoiceTaxType = invoiceTaxType
+        self.invoiceTaxValue = invoiceTaxValue
+        self.excludingTaxValue = excludingTaxValue
+        self.payerUnitName = payerUnitName
+        self.ptaxAccounts = ptaxAccounts
+        self.paddress = paddress
+        self.ptlephone = ptlephone
+        self.pbankName = pbankName
+        self.pbankAccounts = pbankAccounts
+
+        self.customer = customer
+        self.taxAccounts = taxAccounts
+        self.address = address
+        self.tlephone = tlephone
+        self.bankName = bankName
+        self.bankAccounts = bankAccounts
+
 # draw_boxes用于在图片上绘制文字行的边框，并将边框内的图片传递给相应的识别模型，返回识别结果
 def draw_boxes(image_full, det_result):
     image_full = Image.fromarray(image_full)
@@ -121,15 +229,63 @@ def text_detection(image_full, ocr_detection):
     det_result_list = sorted(det_result_list, key=lambda x: 0.01*sum(x[::2])/4+sum(x[1::2])/4)     
     return np.array(det_result_list)
 
+# 增值税普通发票结果处理
+def set_invoice(i:int,result,invoice:InvoicesResult):
+    result2=result[0]
+    if(i==1): # 发票类型 # 311.0,27.0,504.0,28.0,504.0,48.0,311.0,48.0
+        invoice.invoiceType=result2
+    elif(i==4): # 发票号码 # 546.0,42.0,656.0,43.0,656.0,62.0,546.0,62.0
+        invoice.invoiceCode=result2
+    elif(i==9): # 开票日期
+        invoice.invoiceDate=result2
+    elif(i==12):# 付款单位
+        invoice.payerUnitName=result2
+    elif(i==16):# 付款单位纳税人识别号
+        invoice.ptaxAccounts=result2
+    elif(i==21):# 付款单位地址、电话
+        invoice.paddress=result2
+    elif(i==16):# 付款单位纳税人识别号
+        invoice.ptaxAccounts=result2
+    elif(i==27):# 付款单位开户行及账号
+        invoice.pbankName=result2
+    elif(i==38):# 开票内容
+        invoice.invoiceContent=result2
+    elif(i==41):# 单价
+        invoice.invoiceContent=result2
+    elif(i==42):# 不含税额（元）
+        invoice.excludingTaxValue=result2
+    elif(i==43):# 税率
+        invoice.invoiceTaxType=result2
+    elif(i==44):# 税额
+        invoice.invoiceTaxValue=result2
+    elif(i==44):# 价税合计(大写)
+        invoice.capital=result2
+    elif(i==44):# 价税合计(小写)
+        invoice.invoiceTaxValue=result2
+    elif(i==58):# 客户单位
+        invoice.customer=result2
+    elif(i==61):# 客户纳税人识别号
+        invoice.taxAccounts=result2
+    elif(i==66):# 客户地址、电话
+        invoice.address=result2
+    elif(i==71):# 客户纳税人识别号
+        invoice.ptaxAccounts=result2
+    elif(i==70):# 客户开户行及账号
+        invoice.pbankName=result2 
+    return invoice
+
 # 文本识别处理
 def text_recognition(det_result, image_full, ocr_recognition):
     output = []
+    invoice=InvoicesResult()
     for i in range(det_result.shape[0]):
         pts = order_point(det_result[i])
         image_crop = crop_image(image_full, pts)
         result = ocr_recognition(image_crop)
+        invoice=set_invoice(i+1,result['text'],invoice)
         output.append([str(i+1), result['text'], ','.join([str(e) for e in list(pts.reshape(-1))])])
     result = pd.DataFrame(output, columns=['检测框序号', '行识别结果', '检测框坐标'])
+    print(invoice)
     return result
 
 # 一键识别处理函数
@@ -142,6 +298,7 @@ def text_ocr(image_full, types='通用场景'):
         det_result = text_detection(image_full, ocr_detection)
         ocr_result = text_recognition(det_result, image_full, types_dict[types])        
         image_draw = draw_boxes(image_full, det_result)
+        # print(ocr_result.values)
     return image_draw, ocr_result 
 
 

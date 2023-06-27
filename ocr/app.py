@@ -274,18 +274,64 @@ def set_invoice(i:int,result,invoice:InvoicesResult):
         invoice.pbankName=result2 
     return invoice
 
+# 增值税专用发票结果处理
+def set_invoice2(i:int,result,invoice:InvoicesResult):
+    result2=result[0]
+    if(i==1): # 发票类型 # 311.0,27.0,504.0,28.0,504.0,48.0,311.0,48.0
+        invoice.invoiceType=result2
+    elif(i==5): # 发票号码 # 546.0,42.0,656.0,43.0,656.0,62.0,546.0,62.0
+        invoice.invoiceCode=result2
+    elif(i==11): # 开票日期
+        invoice.invoiceDate=result2
+    elif(i==15):# 付款单位
+        invoice.payerUnitName=result2
+    elif(i==19):# 付款单位纳税人识别号
+        invoice.ptaxAccounts=result2
+    elif(i==23):# 付款单位地址、电话
+        invoice.paddress=result2
+    elif(i==29):# 付款单位开户行及账号
+        invoice.pbankName=result2
+    elif(i==41):# 开票内容
+        invoice.invoiceContent=result2
+    elif(i==43):# 单价
+        invoice.invoiceContent=result2
+    elif(i==44):# 不含税额（元）
+        invoice.excludingTaxValue=result2
+    elif(i==45):# 税率
+        invoice.invoiceTaxType=result2
+    elif(i==46):# 税额
+        invoice.invoiceTaxValue=result2
+    elif(i==55):# 价税合计(大写)
+        invoice.capital=result2
+    elif(i==56):# 价税合计(小写)
+        invoice.invoiceTaxValue=result2
+    elif(i==60):# 客户单位
+        invoice.customer=result2
+    elif(i==61):# 客户纳税人识别号
+        invoice.taxAccounts=result2
+    elif(i==71):# 客户地址、电话
+        invoice.address=result2
+    elif(i==67):# 客户纳税人识别号
+        invoice.ptaxAccounts=result2
+    elif(i==76):# 客户开户行及账号
+        invoice.pbankName=result2 
+    return invoice
+
 # 文本识别处理
 def text_recognition(det_result, image_full, ocr_recognition):
     output = []
     invoice=InvoicesResult()
+    invoice2=InvoicesResult()
     for i in range(det_result.shape[0]):
         pts = order_point(det_result[i])
         image_crop = crop_image(image_full, pts)
         result = ocr_recognition(image_crop)
         invoice=set_invoice(i+1,result['text'],invoice)
+        invoice2=set_invoice2(i+1,result['text'],invoice2)
         output.append([str(i+1), result['text'], ','.join([str(e) for e in list(pts.reshape(-1))])])
     result = pd.DataFrame(output, columns=['检测框序号', '行识别结果', '检测框坐标'])
     print(invoice)
+    print(invoice2)
     return result
 
 # 一键识别处理函数

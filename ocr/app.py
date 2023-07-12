@@ -1,4 +1,4 @@
-# 读光OCR-多场景文字识别
+# 读光OCR-多场景文字识别 gradio app.py
 
 from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
@@ -14,6 +14,11 @@ import pandas as pd
 
 # 根据给定的位置参数，对图片进行裁剪和变换，返回裁剪后的图片
 def crop_image(img, position):
+    '''
+    将一个图像中的一个四边形区域裁剪出来，返回一个新的图像。
+    它接受两个参数，img表示一个图像对象，position表示一个包含四个顶点坐标的列表，例如[[x1,y1],[x2,y2],[x3,y3],[x4,y4]]。
+    它返回一个裁剪后的图像对象。
+    '''
     def distance(x1,y1,x2,y2):
         return math.sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2))    
     position = position.tolist()
@@ -43,7 +48,7 @@ def crop_image(img, position):
     corners[1] = [x2, y2]
     corners[2] = [x4, y4]
     corners[3] = [x3, y3]
-
+    # 计算四边形的宽度和高度
     img_width = distance((x1+x4)/2, (y1+y4)/2, (x2+x3)/2, (y2+y3)/2)
     img_height = distance((x1+x2)/2, (y1+y2)/2, (x4+x3)/2, (y4+y3)/2)
 
@@ -57,8 +62,11 @@ def crop_image(img, position):
     dst = cv2.warpPerspective(img, transform, (int(img_width), int(img_height)))
     return dst
 
-# 对给定的坐标点进行排序，返回排序后的坐标点
+# 对给定的坐标点进行坐标排序
 def order_point(coor):
+    '''
+    order_point: 对一个四边形的坐标进行排序，使其按照左上，右上，右下，左下的顺序排列。这样可以方便地对图片进行裁剪或变换
+    '''
     # 将coor参数转换为一个numpy数组，并将其形状改为[4,2]，表示四行两列
     arr = np.array(coor).reshape([4, 2])
     # 计算数组中所有坐标的和，并除以4，得到四边形区域的中心点坐标
@@ -93,6 +101,7 @@ examples = [
 ocr_recognition = pipeline(Tasks.ocr_recognition, model='damo/cv_convnextTiny_ocr-recognition-general_damo')
 # 用于文本检测
 ocr_detection = pipeline(Tasks.ocr_detection, model='damo/cv_resnet18_ocr-detection-line-level_damo')
+
 # 单词检测模型
 # ocr_detection = pipeline(Tasks.ocr_detection, model='damo/cv_resnet18_ocr-detection-word-level_damo')
 # 自然场景模型
@@ -208,25 +217,47 @@ class InvoicesResult:
         self.bankName = bankName
         self.bankAccounts = bankAccounts
 
-# draw_boxes用于在图片上绘制文字行的边框，并将边框内的图片传递给相应的识别模型，返回识别结果
+# draw_boxes用于在图片上绘制文字区域的边框
 def draw_boxes(image_full, det_result):
+    '''
+    在一张图片上绘制文字区域的边框，并标注序号。它需要传入两个参数：
+        image_full是一个numpy数组，表示一张图片；
+        det_result是一个numpy数组，表示文字检测的结果；
+    它返回一个numpy数组，表示绘制后的图片。
+    '''
+    # 将numpy数组转换为Image对象，方便绘制
     image_full = Image.fromarray(image_full)
+    # 创建一个ImageDraw对象，用于在图片上绘制
     draw = ImageDraw.Draw(image_full)
+    # 遍历det_result数组，每个元素是一个四边形的坐标，表示一个文字区域
     for i in range(det_result.shape[0]):
         # import pdb; pdb.set_trace()
+        # 调用order_point函数对四边形的坐标进行排序，使其按照左上，右上，右下，左下的顺序排列
         p0, p1, p2, p3 = order_point(det_result[i])
+        # 在左上角的点附近绘制一个文本，表示文字区域的序号，颜色为蓝色，对齐方式为居中
         draw.text((p0[0]+5, p0[1]+5), str(i+1), fill='blue', align='center')
+        # 绘制一个多边形线条，表示文字区域的边框，颜色为绿色，宽度为5
         draw.line([*p0, *p1, *p2, *p3, *p0], fill='green', width=5)
+    # 将Image对象转换为numpy数组并返回
     image_draw = np.array(image_full)
     return image_draw
 
 # 文字检测处理
 def text_detection(image_full, ocr_detection):
+    '''
+    对一张图片进行文字检测，并按照文字区域的位置从上到下，从左到右进行排序。它需要传入两个参数：
+        image_full是一个图片对象;
+        ocr_detection是一个文字检测函数;
+    它返回一个numpy数组，每个元素是一个四边形的坐标，表示一个文字区域。
+    '''
+    # 调用ocr_detection函数对image_full进行文字检测，返回一个字典，其中’polygons’键对应一个包含多边形坐标的numpy数组
     det_result = ocr_detection(image_full)
     det_result = det_result['polygons']
     # sort detection result with coord
+    # 将numpy数组转换为列表，并按照多边形的中心点的横纵坐标之和进行排序，从小到大
     det_result_list = det_result.tolist()
-    det_result_list = sorted(det_result_list, key=lambda x: 0.01*sum(x[::2])/4+sum(x[1::2])/4)     
+    det_result_list = sorted(det_result_list, key=lambda x: 0.01*sum(x[::2])/4+sum(x[1::2])/4) 
+    # 将排序后的列表转换回numpy数组并返回    
     return np.array(det_result_list)
 
 # 增值税普通发票结果处理
@@ -319,29 +350,38 @@ def set_invoice2(i:int,result,invoice:InvoicesResult):
 
 # 文本识别处理
 def text_recognition(det_result, image_full, ocr_recognition):
+    '''
+    对一张图片中的文字区域进行文字识别，并返回一个表格，包含每个文字区域的序号，识别结果和坐标。它需要传入三个参数：
+        det_result是一个numpy数组，表示文字检测的结果；
+        image_full是一个图片对象；
+        ocr_recognition是一个文字识别函数；
+    返回一个pandas的DataFrame对象，可以用于展示或保存识别结果。
+    '''
+    # 创建一个空列表用于存储识别结果
     output = []
-    invoice=InvoicesResult()
-    invoice2=InvoicesResult()
+    # 遍历det_result数组，每个元素是一个四边形的坐标，表示一个文字区域 
     for i in range(det_result.shape[0]):
+        # 调用order_point函数对四边形的坐标进行排序，使其按照左上，右上，右下，左下的顺序排列
         pts = order_point(det_result[i])
+        # 调用crop_image函数对image_full进行裁剪，得到文字区域的图片
         image_crop = crop_image(image_full, pts)
+        # 调用ocr_recognition函数对文字区域的图片进行文字识别，返回一个字典，其中’text’键对应识别出的文本
         result = ocr_recognition(image_crop)
-        invoice=set_invoice(i+1,result['text'],invoice)
-        invoice2=set_invoice2(i+1,result['text'],invoice2)
+        # 将识别结果添加到output列表中，每个元素是一个包含检测框序号，行识别结果，检测框坐标的列表
         output.append([str(i+1), result['text'], ','.join([str(e) for e in list(pts.reshape(-1))])])
+    # 将output列表转换为pandas的DataFrame对象，并指定列名为’检测框序号’, ‘行识别结果’, ‘检测框坐标’
     result = pd.DataFrame(output, columns=['检测框序号', '行识别结果', '检测框坐标'])
-    print(invoice)
-    print(invoice2)
     return result
 
 # 一键识别处理函数
 def text_ocr(image_full, types='通用场景'):
     if types == '车牌场景':
-        det_result = text_detection(image_full, license_plate_detection)
+        det_result = text_detection(image_full, license_plate_detection)        
         ocr_result = text_recognition(det_result, image_full, ocr_recognition_licenseplate)
         image_draw = draw_boxes(image_full, det_result)
     else:
         det_result = text_detection(image_full, ocr_detection)
+        print(det_result)
         ocr_result = text_recognition(det_result, image_full, types_dict[types])        
         image_draw = draw_boxes(image_full, det_result)
         # print(ocr_result.values)

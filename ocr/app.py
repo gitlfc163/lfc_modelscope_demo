@@ -371,6 +371,7 @@ def text_recognition(det_result, image_full, ocr_recognition):
         output.append([str(i+1), result['text'], ','.join([str(e) for e in list(pts.reshape(-1))])])
     # 将output列表转换为pandas的DataFrame对象，并指定列名为’检测框序号’, ‘行识别结果’, ‘检测框坐标’
     result = pd.DataFrame(output, columns=['检测框序号', '行识别结果', '检测框坐标'])
+    print(output) 
     return result
 
 # 一键识别处理函数
@@ -381,8 +382,9 @@ def text_ocr(image_full, types='通用场景'):
         image_draw = draw_boxes(image_full, det_result)
     else:
         det_result = text_detection(image_full, ocr_detection)
-        print(det_result)
-        ocr_result = text_recognition(det_result, image_full, types_dict[types])        
+        # print(det_result)
+        ocr_result = text_recognition(det_result, image_full, types_dict[types]) 
+        # print(ocr_result)       
         image_draw = draw_boxes(image_full, det_result)
         # print(ocr_result.values)
     return image_draw, ocr_result 
